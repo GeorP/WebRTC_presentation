@@ -1,9 +1,12 @@
 Source code of the example shown at the KharkivJS
 =================================================
 
-These source code examples for the presentation [Real-time communication between browsers. WebRTC.](http://sdrv.ms/Rv0M7b) shown in [Kharkiv](http://kharkivjs.com/) on December 15 at the conference KharkivJS.
+These source code examples for the presentation "[Real-time communication between browsers. WebRTC.](http://sdrv.ms/Rv0M7b)" shown in Kharkiv on December 15 at the conference [KharkivJS](http://kharkivjs.com/).
+
 Presentation and example prepared in accordance with the [W3C Working Draft 21 August 2012](http://www.w3.org/TR/2012/WD-webrtc-20120821/).
+
 Example was tested on Chrome 23.
+
 Specifications may change in the future, as well as the implementation WebRTC in future versions of Google Chrome browser.
 
 
