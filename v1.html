@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Testing webRTC</title>
+    <script src="/socketio"></script>
+    <script src="/event"></script>
+    <script src="/p2p"></script>
+    <script>
+        var myself,
+            transport,
+            targetNick,
+            p2pCall,
+            domRemoteVideo,
+            domLocalVideo;
+
+
+        function initP2pInstance() {
+            p2pCall = new p2pSimpleConnection(myself);
+
+            // Transfer new operation to call target immediately
+            p2pCall.subscribe('NEW_OPERATION', function(operation){
+                transport.emit('transfer_operation', {target: targetNick, operation: operation}, function(){});
+            });
+
+            // Auto-answer incoming calls
+            p2pCall.subscribe('INCOMING_CALL', function(){
+                p2pCall.answerCall();
+            });
+
+            // Display local video when access will be obtained
+            p2pCall.subscribe('LOCAL_MEDIA_STREAM', function(stream){
+                document.getElementById('video_call').style.display = 'block';
+                domLocalVideo.src = webkitURL.createObjectURL(stream);
+            });
+
+            // Display remote video
+            p2pCall.subscribe('STREAM_ADDED', function(stream){
+                domRemoteVideo.src = webkitURL.createObjectURL(stream);
+            });
+        }
+
+
+        function getUserListItem(nick) {
+            var el = document.createElement('li');
+            el.appendChild(document.createTextNode(nick));
+            el.setAttribute('title', 'Call ' + nick)
+            el.dataset.nick = nick;
+            return el;
+        }
+
+        function updateUserList(userList) {
+            var domUserList = document.getElementById('user_list');
+            var fragment = document.createDocumentFragment();
+            for (var i = 0, l = userList.length; i < l; i += 1) {
+                var user = userList[i];
+                if (user == myself) {
+                    continue;
+                }
+                fragment.appendChild(getUserListItem(user));
+            }
+            domUserList.innerHTML = '';
+            domUserList.appendChild(fragment);
+            document.getElementById('user_list_empty').style.display = 'none';
+        }
+
+        function onUserListClick(event) {
+            targetNick = event.target.dataset.nick;
+            initP2pInstance();
+            p2pCall.startCall();
+        }
+
+        function connectToServer(nick) {
+            // Connecting to server
+            transport = io.connect('http://localhost:8081');
+            transport.on('connect', function(){
+                // Login with entered nick
+                transport.emit('login', {nick: nick}, function(data){
+                    //hide enter form
+                    document.getElementById('enter_dialog').style.display = 'none';
+
+                    //fill your nick
+                    document.getElementById('your_nick').innerText = nick;
+
+                    //display chat user list block.
+                    document.getElementById('chat_user_list').style.display = 'block';
+
+                    // Click handler to start call with selected user
+                    document.getElementById('user_list').addEventListener('click', onUserListClick);
+                    
+                    // Process user list
+                    if (data.user_list) {
+                        var userList = data.user_list;
+                        if (userList.length == 0) {
+                            document.getElementById('loading_user_list').style.display = 'none';
+                            document.getElementById('user_list_empty').style.display = 'block';
+                        } else {
+                            updateUserList(userList);
+                            document.getElementById('loading_user_list').style.display = 'none';
+                            document.getElementById('user_list').style.display = 'block';
+                        }
+                    }
+                    
+                });
+            });
+
+            transport.on('new_operation', function(data){
+                if (!p2pCall) {
+                    targetNick = data.operation.from;
+                    initP2pInstance();
+                }
+                p2pCall.processOperation(data.operation);
+            });
+
+            transport.on('user_list_updated', function(data){
+                updateUserList(data.user_list);
+            });
+
+        }
+
+
+        function enterDialogToCenter() {
+            var headTitleHeight = window.getComputedStyle(document.getElementById('head_title'), null).getPropertyValue('height');
+            headTitleHeight = parseInt(headTitleHeight, 10);
+            var enterDialogHeight = window.getComputedStyle(document.getElementById('enter_dialog'), null).getPropertyValue('height');
+            enterDialogHeight = parseInt(enterDialogHeight, 10);
+            var offset = window.innerHeight - parseInt(window.innerHeight / 1.618, 10) - headTitleHeight - enterDialogHeight;
+            document.getElementById('enter_dialog').style.marginTop = offset+'px';
+            var enterLabelWidth = window.getComputedStyle(document.getElementById('enter_label'), null).getPropertyValue('width');
+            enterLabelWidth = parseInt(enterLabelWidth, 10);
+            enterLabelWidth = document.getElementById('enter_label').offsetWidth
+            document.getElementById('enter_nick').style.width = enterLabelWidth+'px';
+        }
+
+        window.addEventListener('load', function() {
+            domLocalVideo = document.getElementById('local_video');
+            domRemoteVideo = document.getElementById('remote_video');
+            enterDialogToCenter();
+
+            document.getElementById('enter_action').addEventListener('submit', function(e) {
+                e.preventDefault();
+                var domEnterNick = document.getElementById('enter_nick');
+                var nick = domEnterNick.value.trim();
+                if (nick == '') {
+                    domEnterNick.value = '';
+                    domEnterNick.placeholder = "nick must not be empty";
+                    return;
+                }
+                myself = nick;
+                connectToServer(nick);
+                return false;
+            });
+        });
+    </script>
+    <style type="text/css">
+        ul.user_list {
+            padding-left: 0;
+            list-style-type: none;
+        }
+
+        ul.user_list li {
+            font-size: 1.05em;
+            padding-top: 0.5em;
+            cursor: pointer;
+        }
+
+        ul.user_list li:hover {
+            text-decoration: underline;
+        }
+
+        .local-video {
+            z-index: 1;
+            position: absolute;
+            border: 2px solid white;
+            left: 10px;
+            bottom: 10px;
+        }
+    </style>
+</head>
+<body style="padding: 0; margin: 0;">
+    <h1 id="head_title" style="text-align: center; font-size: 2em;">Testing webRTC</h1>
+
+    <!-- No WebRTC support section  -->
+
+
+    <!-- Enter dialog section  -->
+    <div id="enter_dialog" style="text-align: center;">
+        <form  id="enter_action" style="text-align: left; display: inline-block;">
+            <label id="enter_label" for="enter_nick" style="font-size: 1.6em;">Please, enter your nickname:</label><br />
+            <input type="text" id="enter_nick" style="font-size: 1em;" /> <input type="submit" value="Go" style="font-size: 1em;">
+        </form>
+    </div>
+
+
+    <!-- Logged in section  -->
+
+    <!-- Chat user list  -->
+    <div id="chat_user_list" style=" display: none; padding: 0 2em; width: 300px; float: left;">
+        <div style="font-size: 1.1em">You are <span id="your_nick"  style="font-size: 1.3em"></span></div>
+        <div id="loading_user_list">Loading chat list ...</div>
+        <div id="user_list_empty" style="display: none;">No one else in chat</div>
+        <ul id="user_list" class="user_list"></ul>
+    </div>
+
+    <!-- Video call  -->
+    <div id="video_call" style=" display: none; position: relative; float: left;">
+        <video id="remote_video" autoplay></video>
+        <video id="local_video" autoplay width="200" class="local-video"></video>
+    </div>
+
+</body>
+</html>
