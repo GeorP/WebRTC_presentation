@@ -31,6 +31,9 @@ Configure and run example
 * Make sure that in http.js file, variable **routeMap** (key "/socketio"), path to socket.io library is correct
 * Edit **port** variable at the beginning of the server.js file -- this port will be used by websocket server
 * Run http and websocket server:
+
    $ node http.js
+
    $ node server.js
+
 * If you didn't change http server port, then open in Chrome 23 url 'http://localhost:81/' (or use port that you set)
